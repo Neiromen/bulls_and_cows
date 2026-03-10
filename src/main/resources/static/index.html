@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Быки и коровы</title>
+</head>
+<body>
+    <h1>Быки и коровы</h1>
+    <p>Угадай 4-значное число. Цифры не повторяются.</p>
+
+    <button onclick="startGame()">Начать игру</button>
+    <button onclick="endGame()">Сдаться</button>
+
+    <div id="gameArea" hidden>
+        <input type="text" id="guessInput" maxlength="4" placeholder="Введи число">
+        <button onclick="makeGuess()">Проверить</button>
+    </div>
+
+    <div id="result"></div>
+    <div id="history"></div>
+
+    <script>
+        var gameId = null;
+
+        function startGame() {
+            fetch('/api/game/start', {
+                method: 'POST'
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                gameId = data.gameId;
+                document.getElementById('gameArea').hidden = false;
+                document.getElementById('result').textContent = 'Игра начата!';
+                document.getElementById('history').innerHTML = '';
+            });
+        }
+
+        function makeGuess() {
+            if (!gameId) return;
+
+            var guess = document.getElementById('guessInput').value;
+            if (guess.length != 4) {
+                alert('Введи 4 цифры');
+                return;
+            }
+
+            fetch('/api/game/' + gameId + '/guess', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ guess: guess })
+            })
+            .then(function(response) {
+                return response.json().then(function(data) {
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Ошибка');
+                    }
+                    return data;
+                });
+            })
+            .then(function(data) {
+                var msg = data.bulls + ' быков, ' + data.cows + ' коров';
+                document.getElementById('result').textContent = data.message;
+
+                var historyDiv = document.getElementById('history');
+                historyDiv.innerHTML = guess + ' - ' + msg + '<br>' + historyDiv.innerHTML;
+
+                if (data.won) {
+                    document.getElementById('gameArea').hidden = true;
+                    gameId = null;
+                }
+
+                document.getElementById('guessInput').value = '';
+            })
+            .catch(function(err) {
+                document.getElementById('result').textContent = 'Ошибка: ' + err;
+            });
+        }
+
+        function endGame() {
+            if (!gameId) return;
+
+            fetch('/api/game/' + gameId + '/end', {
+                method: 'POST'
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                document.getElementById('gameArea').hidden = true;
+                document.getElementById('result').textContent = 'Игра завершена. Загаданное число: ' + data.secretNumber;
+                gameId = null;
+            });
+        }
+    </script>
+</body>
+</html>
